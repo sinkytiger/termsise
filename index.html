@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>텀시세 · 벤처투자 조건 지도 (데모)</title>
+<meta name="description" content="DART 공시로 만든 한국 벤처투자 조건 지도. 파일럿 207개사 실측 데이터로 동작하는 데모.">
+<style>
+/* dataviz 기준 팔레트: 계열은 slot 1(blue) 하나, 강조는 같은 hue의 진한 단계, 상태색은 아이콘+글자와 함께만 */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface-1: #fcfcfb; --surface-2: #ffffff;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #6f6d68;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6; --seq-100: #cde2fb; --seq-550: #1c5cab;
+  --status-good: #0c8a5a; --status-warning: #b77c00; --status-critical: #d03b3b;
+  --neutral-chip: #f0efec; --demo: #eb6834;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface-1: #1a1a19; --surface-2: #222220;
+    --text-primary: #f6f5f2; --text-secondary: #c3c2b7; --text-muted: #9a988f;
+    --grid: #2c2c2a; --axis: #4a4945; --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --seq-100: #184f95; --seq-550: #86b6ef;
+    --status-good: #2fb07c; --status-warning: #e0a400; --status-critical: #e66767;
+    --neutral-chip: #2c2c2a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface-1: #1a1a19; --surface-2: #222220;
+  --text-primary: #f6f5f2; --text-secondary: #c3c2b7; --text-muted: #9a988f;
+  --grid: #2c2c2a; --axis: #4a4945; --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5; --seq-100: #184f95; --seq-550: #86b6ef;
+  --status-good: #2fb07c; --status-warning: #e0a400; --status-critical: #e66767;
+  --neutral-chip: #2c2c2a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background: var(--page); color: var(--text-primary); font-size: 15px; line-height: 1.55; }
+a { color: var(--series-1); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+header { background: var(--surface-2); border-bottom: 1px solid var(--grid); position: sticky; top: 0; z-index: 5; }
+.top { display: flex; align-items: center; gap: 18px; min-height: 60px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+.brand b { font-size: 21px; letter-spacing: -0.5px; }
+.brand span { font-size: 13px; color: var(--text-secondary); margin-left: 6px; }
+nav { display: flex; gap: 4px; }
+nav button { font: inherit; font-size: 14px; border: 0; background: none; color: var(--text-secondary); padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+nav button[aria-selected="true"] { background: var(--neutral-chip); color: var(--text-primary); font-weight: 650; }
+.right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+.pill { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--demo); white-space: nowrap; }
+.pill::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--demo); margin-right: 6px; vertical-align: 1px; }
+.theme { font: inherit; font-size: 13px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary); border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+main { padding: 22px 0 40px; }
+@media (max-width: 640px) { header { position: static; } h1 { font-size: 21px; } }
+section[hidden] { display: none; }
+h1 { font-size: 24px; letter-spacing: -0.4px; }
+h2 { font-size: 17px; margin-bottom: 2px; }
+.lead { color: var(--text-secondary); margin: 6px 0 18px; }
+.basis { font-size: 13px; color: var(--text-muted); }
+.grid { display: grid; gap: 14px; }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; min-width: 0; }
+.sub { font-size: 13px; color: var(--text-secondary); }
+.foot { font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+.tile .label { font-size: 13.5px; color: var(--text-secondary); }
+.tile .value { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tile .value small { font-size: 15px; font-weight: 500; color: var(--text-secondary); margin-left: 3px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { font-family: inherit; }
+.ax { fill: var(--text-muted); font-size: 12px; }
+.vl { fill: var(--text-primary); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cols { display: grid; gap: 8px; align-items: end; height: 190px; padding-top: 34px; border-bottom: 1px solid var(--axis); }
+.col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; position: relative; }
+.col .cv { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.col .cb { width: 100%; background: var(--series-1); border-radius: 4px 4px 0 0; min-height: 2px; }
+.col.me .cb { background: var(--seq-550); }
+.col .me-l { position: absolute; top: -30px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.colx { display: grid; gap: 8px; margin-top: 6px; }
+.colx span { font-size: 12.5px; color: var(--text-muted); text-align: center; line-height: 1.25; }
+.bar { fill: var(--series-1); }
+.bar.me { fill: var(--seq-550); }
+.hit { fill: transparent; cursor: default; }
+details { margin-top: 8px; font-size: 13px; }
+summary { cursor: pointer; color: var(--text-secondary); }
+table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--grid); }
+th { color: var(--text-muted); font-weight: 500; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.hbar { display: grid; grid-template-columns: minmax(150px, 1.4fr) 2fr 70px; align-items: center; gap: 10px; font-size: 13.5px; padding: 5px 0; }
+.track { height: 10px; background: var(--neutral-chip); border-radius: 0 4px 4px 0; }
+.track i { display: block; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; }
+.hbar .v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.hbar .v small { color: var(--text-muted); font-weight: 400; }
+.quote { display: grid; grid-template-columns: minmax(130px, auto) 1fr; gap: 8px 14px; font-size: 14px; margin-top: 10px; }
+.quote .src { font-size: 12.5px; color: var(--text-muted); }
+mark { background: var(--seq-100); color: var(--text-primary); padding: 0 2px; border-radius: 3px; }
+#tip { position: fixed; pointer-events: none; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-radius: 8px; padding: 6px 9px; font-size: 13px; display: none; z-index: 10; }
+/* 내 조건 */
+.mine { grid-template-columns: minmax(280px, 360px) 1fr; align-items: start; }
+@media (max-width: 820px) { .mine { grid-template-columns: 1fr; } }
+form label { display: block; font-size: 13.5px; font-weight: 600; margin: 14px 0 5px; }
+form label:first-child { margin-top: 0; }
+form .hint { font-size: 12.5px; color: var(--text-muted); font-weight: 400; }
+input[type=number], input[type=date], select { font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface-2); color: var(--text-primary); }
+form label.check, .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; font-weight: 400; margin: 6px 0; cursor: pointer; }
+.check input { margin-top: 4px; }
+fieldset { border: 0; }
+.res h3 { font-size: 15px; margin: 4px 0 6px; }
+.row { padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.row:last-child { border-bottom: 0; }
+.row .k { font-weight: 650; }
+.row .pos { color: var(--text-secondary); font-size: 14px; margin-top: 3px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; padding: 3px 10px 3px 6px; border-radius: 999px; background: var(--neutral-chip); margin-top: 6px; }
+.chip .d { width: 16px; height: 16px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.chip.serious .d { background: var(--status-critical); }
+.chip.warn .d { background: var(--status-warning); }
+.chip.none .d { background: var(--text-muted); }
+.chip.good .d { background: var(--status-good); }
+.law { font-size: 12.5px; color: var(--text-muted); }
+ol.q { padding-left: 20px; font-size: 14px; }
+ol.q li { margin: 5px 0; }
+.note { font-size: 12.5px; color: var(--text-muted); margin-top: 10px; }
+.method li { margin: 5px 0 5px 18px; }
+footer { border-top: 1px solid var(--grid); padding: 18px 0 30px; font-size: 12.5px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand"><b>텀시세</b><span>공시로 만든 한국 벤처투자 조건 지도</span></div>
+    <nav role="tablist">
+      <button role="tab" data-t="map" aria-selected="true">투자조건 지도</button>
+      <button role="tab" data-t="mine" aria-selected="false">내 조건 넣기</button>
+      <button role="tab" data-t="how" aria-selected="false">방법과 한계</button>
+    </nav>
+    <div class="right"><span class="pill" id="pill"></span><button class="theme" id="theme" type="button">화면 밝기</button></div>
+  </div>
+</header>
+
+<main class="wrap">
+<!-- 1. 지도 -->
+<section id="map">
+  <h1>투자조건 지도</h1>
+  <p class="lead" id="mapLead"></p>
+  <div class="grid g4" id="tiles"></div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card"><h2>연복리 상환보장수익률</h2><div class="sub" id="ryNote"></div><div id="ryChart" style="margin-top:10px"></div><details><summary>표로 보기</summary><div id="ryTable"></div></details></div>
+    <div class="card"><h2>상환청구 개시 시점</h2><div class="sub" id="rsNote"></div><div id="rsChart" style="margin-top:10px"></div><details><summary>표로 보기</summary><div id="rsTable"></div></details></div>
+    <div class="card"><h2>전환가 조정(리픽싱) 조항</h2><div class="sub" id="rfNote"></div><div id="rfBars" style="margin-top:10px"></div><div class="foot" id="rfFoot"></div></div>
+  </div>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card"><h2>기간</h2><div class="sub">10년으로 끝나는 비율</div><div id="periods" style="margin-top:10px"></div></div>
+    <div class="card"><h2>특수 사유 이율</h2><div class="sub" id="spNote"></div><div id="spList" style="margin-top:10px"></div><div class="foot">IPO 실패·풋옵션·위약금 등 특정 사유에만 붙는 이율. 지연배상금 제외. 주주간계약에만 있는 조항은 공시에 없어 실제보다 적게 잡힘</div></div>
+    <div class="card"><h2>우선주 보유자</h2><div class="sub" id="hdNote"></div><div id="hdBars" style="margin-top:10px"></div><div class="foot">벤처투자조합은 DIVA(벤처투자회사 전자공시) 등록 목록과 이름 대조, 나머지는 이름 규칙으로 나눈 추정. 한 회사에 여러 유형이 있을 수 있음</div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <h2>모든 값은 공시 원문으로</h2><div class="sub">지도의 값은 DART 감사보고서 주석의 원문 구절에서 뽑았습니다 · 파일럿 표본의 실제 구절</div>
+    <div class="quote" id="quotes"></div>
+  </div>
+</section>
+
+<!-- 2. 내 조건 -->
+<section id="mine" hidden>
+  <h1>내 조건 넣기</h1>
+  <p class="lead">받은 텀시트·계약서의 조건을 넣으면, 공시 사례 사이에서의 위치와 상대 투자자 유형에 따라 적용되는 규칙을 보여줍니다. 입력값은 이 브라우저 밖으로 나가지 않습니다.</p>
+  <div class="grid mine">
+    <form class="card" id="f" onsubmit="return false">
+      <label for="ryIn">상환보장수익률 (연복리, %)</label>
+      <input id="ryIn" type="number" min="0" max="40" step="0.1" value="15">
+      <label for="rsIn">상환청구 개시 (발행 후 몇 년, 년)</label>
+      <input id="rsIn" type="number" min="0" max="15" step="0.5" value="2">
+      <label>전환가 조정</label>
+      <label class="check"><input type="checkbox" id="ipo" checked><span>IPO 공모가에 연동해 조정</span></label>
+      <label class="check"><input type="checkbox" id="dil" checked><span>후속 저가 발행 시 그 가격으로 조정 (최저가 방식)</span></label>
+      <label class="check"><input type="checkbox" id="nofloor" checked><span>조정 하한이 없음</span></label>
+      <label>상환·조정 사유</label>
+      <label class="check"><input type="checkbox" id="perf"><span>실적·성과 목표 미달 시 조기상환 또는 전환가 하향</span></label>
+      <label class="check"><input type="checkbox" id="nograce"><span>유예기간 없이 조기상환을 요구할 수 있음</span></label>
+      <label class="check"><input type="checkbox" id="listing"><span>상장하지 못하면 전환가 하향</span></label>
+      <label>대표이사 등 이해관계인</label>
+      <label class="check"><input type="checkbox" id="joint" checked><span>회사 의무에 대표이사 개인이 연대책임을 짐</span></label>
+      <label for="inv">상대 투자자 유형</label>
+      <select id="inv">
+        <option value="ac">창업기획자(액셀러레이터)</option>
+        <option value="vfund">벤처투자조합</option>
+        <option value="pfund">개인투자조합</option>
+        <option value="vc">벤처투자회사 (고유계정)</option>
+        <option value="sintech">신기술사업금융업자·신기술사업투자조합</option>
+        <option value="unknown">모름·기타</option>
+      </select>
+      <label for="dt">계약일 <span class="hint">(법 시행일과 비교)</span></label>
+      <input id="dt" type="date">
+      <p class="note">기본값은 가상 계약(시드 5억원 RCPS)입니다.</p>
+    </form>
+    <div class="card res" id="out"></div>
+  </div>
+</section>
+
+<!-- 3. 방법 -->
+<section id="how" hidden>
+  <h1>방법과 한계</h1>
+  <div class="grid g3" style="margin-top:14px">
+    <div class="card method"><h2>데이터</h2><ul id="mData"></ul></div>
+    <div class="card method"><h2>추출과 검증</h2><ul id="mCheck"></ul></div>
+    <div class="card method"><h2>한계</h2><ul id="mLimit"></ul></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h2>법 규칙 근거</h2>
+    <ul class="method" style="margin-top:6px">
+      <li>이해관계인 연대책임 금지: 벤처투자법 개정(법률 제21287호, 2025.12.30 공포, 해당 조항은 공포일 시행) — 개인투자조합·벤처투자조합·창업기획자·벤처투자회사의 투자. 고의·중과실과 법에 열거된 사유만 예외</li>
+      <li>불공정 계약조건 금지(제52조의2): 벤처투자법 개정(법률 제22034호, 2026.9.29 공포, 2027.3.30 시행) — 벤처투자조합 업무집행조합원이 시행 후 새로 맺는 계약. 해당 부분 무효, 세부 범위는 대통령령(미정)</li>
+      <li>신기술사업금융업자 고유계정·신기술사업투자조합은 위 두 규정의 대상이 아님 (여신전문금융업법 개정안 국회 계류)</li>
+      <li>2026.6.30 개정 벤처투자 표준계약서: CPS 중심, 리픽싱 가중평균 기본안, IPO 조항 최선노력, 이해관계인 연대책임 제한</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    이 페이지는 공시 통계와 일반 법률 정보를 보여주는 데모이며, 개별 사안에 대한 법률 자문이 아닙니다. 서명 전에는 변호사 검토를 받으세요 (중소벤처기업부 스타트업 법률지원사업: 투자계약서 검토 포함, 기업당 최대 300만원·건당 100만원, <a href="https://www.k-startup.go.kr" rel="noopener">K-Startup</a>에서 신청).<br>
+    데이터: OpenDART 감사보고서(금융감독원), DIVA 조합현황(한국벤처캐피탈협회), 국가법령정보센터 · 2026 AI 플랫폼 구축 경진대회 예선 기획서 데모 · 김규호
+  </div>
+</footer>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const D = {"asof": "2026-10-13", "n": 207, "drawn": 6619, "kw_hits": 248, "own_rate": 0.0312736062849373, "own_ci": [0.027344663880652514, 0.035746321112858415], "population": 37521, "has_red": 178, "ry": [0, 0, 0, 0, 1.5, 2, 2, 2.1, 3, 3, 3, 3, 3, 4, 4, 4.12, 4.19, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5.5, 5.58, 5.88, 6, 6, 6, 6.0, 6, 6, 6.0, 6, 6, 6, 6.0, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6.3, 7, 7.0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7.0, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8.0, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8.0, 8, 8.0, 8.5, 8.65, 9, 10, 10.73, 12, 12, 14, 15, 15, 19, 19.44], "ry_median": 7.0, "ry_mode_n": 32, "ry_gt8": 12, "rs": [0.5, 1, 1, 1, 1, 1, 1, 1, 1.0, 1, 1.2, 1.4, 1.5, 1.5, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.5, 2.7, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.0, 3, 3.0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.0, 3, 3, 3.0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.0, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.0, 3, 3, 3, 3, 3, 3, 3.0, 3, 3, 3, 3, 3, 3, 3, 3, 3.8333, 4, 4, 4, 4, 4.0, 4, 4, 4, 4, 4, 4, 4, 4.0, 4.8, 5.0, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 7, 10, 12.2], "rs3": 108, "dur_n": 114, "dur10": 100, "re_n": 83, "re10": 67, "cp_n": 150, "cp10": 127, "rf": [["IPO 공모가 연동 조정", 86], ["후속 저가 발행 시 조정", 81], ["M&A 평가가액 연동 조정", 41], ["실적·성과 목표 미달 시 조정", 24], ["상장 실패·기한 미달 시 조정", 3], ["상장 기한 미달을 상환 사유로", 5], ["조정 하한 기재", 2]], "dil_method": {"최저가": 24, "가중평균": 2, "미기재": 55}, "mna_pct_n": 29, "mna_pct_all70": true, "cond": 29, "special": [5, 5, 5, 6, 8, 8, 15, 15, 19.0], "special_trig": {"계약위반·풋옵션": 6, "기타": 2, "IPO실패": 1}, "holder_named": 125, "holder_diva": 68, "holder_venture_act": 69, "holder_unknown": 44, "holder_types": {"벤처투자조합(DIVA 확인)": 68, "기타 법인·개인": 65, "금융·투자회사": 50, "투자조합(유형 미상)": 39, "신기술사업투자조합": 26, "사모펀드": 19, "개인투자조합": 5, "벤처투자조합": 2}, "acc": [561, 564], "quotes_total": 5175, "full": {"frame": 37521, "collected": 24971, "ok": 24953, "hits": 893, "complete": false}, "quotes": [{"corp": "긴트", "doc": "2025 감사보고서", "rcp": "20260326001187", "text": "납입기일 다음날로부터 3년이 경과한 날부터 상환청구 가능 … 상환시 보장수익률 상환일까지 연복리 8.00% 적용", "mark": "연복리 8.00%"}, {"corp": "휴넷플러스", "doc": "2025 감사보고서", "rcp": "20260406001572", "text": "전환가격을 하회하는 가격으로 유상증자 … 발행할 경우에는 전환가격은 그 하회하는 발행가격으로 조정한다", "mark": "전환가격은 그 하회하는 발행가격으로 조정한다"}]};
+const $ = s => document.querySelector(s);
+const pct = (a, b) => Math.round(a / b * 100);
+const fmt = x => (Math.round(x * 100) / 100).toString();
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* 테마: 브라우저 저장은 편의 기능일 뿐 (실패해도 동작) */
+function setTheme(t) { if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme"); }
+try { setTheme(localStorage.getItem("ts-theme")); } catch (e) {}
+$("#theme").onclick = () => {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark" ||
+    (!document.documentElement.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+  const t = dark ? "light" : "dark"; setTheme(t); try { localStorage.setItem("ts-theme", t); } catch (e) {}
+};
+
+/* 탭 */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => show(b.dataset.t));
+function show(t) {
+  document.querySelectorAll("nav button").forEach(b => b.setAttribute("aria-selected", b.dataset.t === t));
+  ["map", "mine", "how"].forEach(id => $("#" + id).hidden = id !== t);
+  if (location.hash !== "#" + t) history.replaceState(null, "", "#" + t);
+}
+function fromHash() { show(["#mine", "#how"].includes(location.hash) ? location.hash.slice(1) : "map"); window.scrollTo(0, 0); }
+window.addEventListener("hashchange", fromHash);
+if (location.hash) fromHash();
+
+/* 툴팁 */
+const tip = $("#tip");
+function hover(el, html) {
+  el.addEventListener("mousemove", e => { tip.innerHTML = html; tip.style.display = "block"; tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px"; });
+  el.addEventListener("mouseleave", () => tip.style.display = "none");
+}
+
+/* 상단 */
+$("#pill").textContent = `데모 · 파일럿 ${D.n}개사 실측`;
+$("#mapLead").innerHTML = `DART 감사보고서(2026.3~5 접수 비상장 외감법인 ${D.population.toLocaleString()}개사) 중 무작위 ${D.drawn.toLocaleString()}건을 읽어, 자사 우선주 조건이 적힌 <b>${D.n}개사</b>의 투자 조건을 모았습니다. ` +
+  (D.full && D.full.complete ? `원문은 ${D.full.ok.toLocaleString()}개사 전수 확보(키워드 적중 ${D.full.hits.toLocaleString()}개사), 조건 추출은 진행 예정입니다.` : `전수 조건 추출은 진행 예정입니다.`);
+
+/* 타일 */
+const ryN = D.ry.length, rsN = D.rs.length;
+const tiles = [
+  ["투자자 상환권이 있는 우선주", pct(D.has_red, D.n), "%", `${D.n}개사 중 ${D.has_red}개사`],
+  ["상환보장수익률 중앙값", D.ry_median.toFixed(1), "%/년", `연복리 ${ryN}개사 · 가장 흔한 값 8% (${D.ry_mode_n}개사)`],
+  ["연복리 8% 초과", pct(D.ry_gt8, ryN), "%", `${ryN}개사 중 ${D.ry_gt8}개사 · 최고 ${fmt(Math.max(...D.ry))}%`],
+  ["조건 미달 시 전환가 하향·조기상환", pct(D.cond, D.n), "%", `${D.n}개사 중 ${D.cond}개사 · 실적·상장 기준`],
+];
+$("#tiles").innerHTML = tiles.map(t => `<div class="card tile"><div class="label">${t[0]}</div><div class="value">${t[1]}<small>${t[2]}</small></div><div class="foot">${t[3]}</div></div>`).join("");
+
+/* 히스토그램 (단일 계열, 막대 위 값, 호버, 표 보기) */
+const ryBins = [["4% 이하", x => x <= 4], ["4~6%", x => x > 4 && x < 6], ["6%대", x => x >= 6 && x < 7], ["7%대", x => x >= 7 && x < 8], ["8%", x => x === 8], ["8% 초과", x => x > 8]];
+const rsBins = [["1년 이하", x => x <= 1], ["1~3년", x => x > 1 && x < 3], ["3년", x => x === 3], ["3~5년", x => x > 3 && x <= 5], ["5년 초과", x => x > 5]];
+function hist(el, tableEl, vals, bins, unitN, meIdx, meLabel) {
+  const counts = bins.map(b => vals.filter(b[1]).length), max = Math.max(...counts), cols = `repeat(${bins.length}, 1fr)`;
+  el.innerHTML = `<div class="cols" role="img" aria-label="${unitN} 분포" style="grid-template-columns:${cols}">` +
+    counts.map((c, i) => `<div class="col${i === meIdx ? " me" : ""}" data-i="${i}">${i === meIdx && meLabel ? `<span class="me-l">▼ ${esc(meLabel)}</span>` : ""}<span class="cv">${c}</span><div class="cb" style="height:${max ? c / max * 100 : 0}%"></div></div>`).join("") +
+    `</div><div class="colx" style="grid-template-columns:${cols}">` + bins.map(b => `<span>${b[0]}</span>`).join("") + `</div>`;
+  el.querySelectorAll(".col").forEach(col => { const i = +col.dataset.i; hover(col, `<b>${bins[i][0]}</b> · ${counts[i]}개사 (${pct(counts[i], vals.length)}%)`); });
+  if (tableEl) tableEl.innerHTML = `<table><tr><th>구간</th><th class="n">회사 수</th><th class="n">비율</th></tr>` +
+    counts.map((c, i) => `<tr><td>${bins[i][0]}</td><td class="n">${c}</td><td class="n">${pct(c, vals.length)}%</td></tr>`).join("") + `</table>`;
+}
+$("#ryNote").textContent = `회사별 최댓값 · ${ryN}개사 · 중앙값 ${D.ry_median.toFixed(1)}% · ${pct(ryN - D.ry_gt8, ryN)}%가 8% 이하`;
+$("#rsNote").textContent = `${rsN}개사 · 3년이 ${D.rs3}개사(${pct(D.rs3, rsN)}%)`;
+hist($("#ryChart"), $("#ryTable"), D.ry, ryBins, "상환보장수익률");
+hist($("#rsChart"), $("#rsTable"), D.rs, rsBins, "상환청구 개시");
+
+/* 가로 막대 */
+function hbars(el, rows, total) {
+  const max = Math.max(...rows.map(r => r[1]));
+  el.innerHTML = rows.map(r => `<div class="hbar"><span>${esc(r[0])}</span><div class="track"><i style="width:${Math.max(1.5, r[1] / max * 100)}%"></i></div><span class="v">${r[1]}<small> · ${pct(r[1], total)}%</small></span></div>`).join("");
+  el.querySelectorAll(".hbar").forEach((h, i) => hover(h, `<b>${esc(rows[i][0])}</b> · ${rows[i][1]}개사 / ${total}개사`));
+}
+$("#rfNote").textContent = `${D.n}개사 기준 · 회사 수`;
+hbars($("#rfBars"), D.rf, D.n);
+const dm = D.dil_method;
+$("#rfFoot").textContent = `저가 발행 조정 방식이 적힌 ${dm["최저가"] + dm["가중평균"]}개사 중 ${dm["최저가"]}개사가 최저가 방식 (2026 표준 기본안은 가중평균) · M&A 연동 비율이 적힌 ${D.mna_pct_n}개사${D.mna_pct_all70 ? " 모두 70%" : ""}`;
+
+$("#periods").innerHTML = [["존속기간", D.dur10, D.dur_n], ["상환청구 종료", D.re10, D.re_n], ["전환청구 종료", D.cp10, D.cp_n]]
+  .map(r => `<div class="hbar" style="grid-template-columns: 120px 1fr 90px"><span>${r[0]}</span><div class="track"><i style="width:${r[1] / r[2] * 100}%"></i></div><span class="v">${pct(r[1], r[2])}%<small> · ${r[1]}/${r[2]}</small></span></div>`).join("");
+
+const sp = D.special;
+$("#spNote").textContent = `${sp.length}개사 · ${fmt(Math.min(...sp))}~${fmt(Math.max(...sp))}% · 중앙값 ${fmt(sp.slice().sort((a, b) => a - b)[Math.floor(sp.length / 2)])}%`;
+hbars($("#spList"), Object.entries(D.special_trig).map(([k, v]) => [{ "IPO실패": "IPO 실패", "계약위반·풋옵션": "계약 위반·풋옵션·위약금", "기타": "기타 상환 사유" }[k] || k, v]), sp.length);
+
+const ht = D.holder_types, order = ["벤처투자조합(DIVA 확인)", "신기술사업투자조합", "사모펀드", "개인투자조합", "금융·투자회사", "투자조합(유형 미상)", "기타 법인·개인"];
+$("#hdNote").textContent = `이름이 적힌 ${D.holder_named}개사 · 등록 벤처투자조합 보유 ${D.holder_diva}개사`;
+hbars($("#hdBars"), order.filter(k => ht[k]).map(k => [k.replace("(DIVA 확인)", " (DIVA 확인)"), ht[k]]), D.holder_named);
+
+$("#quotes").innerHTML = D.quotes.map(q => `<span class="src">${esc(q.corp)} · ${esc(q.doc)}<br><a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${q.rcp}" target="_blank" rel="noopener">DART ${q.rcp}</a></span><span>“${esc(q.text).replace(esc(q.mark), "<mark>" + esc(q.mark) + "</mark>")}”</span>`).join("");
+
+/* 방법 */
+$("#mData").innerHTML = [
+  `모집단: 2026.3~5 접수 비상장 외감법인 감사보고서 ${D.population.toLocaleString()}개사 (OpenDART)`,
+  `무작위 ${D.drawn.toLocaleString()}건 → 우선주 키워드 ${D.kw_hits}개사 → 자사 우선주 조건 ${D.n}개사 (${(D.own_rate * 100).toFixed(1)}%, 95% 구간 ${(D.own_ci[0] * 100).toFixed(1)}~${(D.own_ci[1] * 100).toFixed(1)}%)`,
+  D.full && D.full.complete ? `전수 원문 ${D.full.ok.toLocaleString()}개사 확보, 키워드 적중 ${D.full.hits.toLocaleString()}개사 (조건 추출 예정)` : `전수 원문 수집 중, 조건 추출은 다음 단계`,
+  `보유자 유형: DIVA 조합현황(2026년 8월 공시, 운영 중 벤처투자조합 2,551개)과 이름 대조`,
+].map(x => `<li>${x}</li>`).join("");
+$("#mCheck").innerHTML = [
+  `LLM이 조건을 뽑고, 모든 값에 원문 구절을 붙여 코드가 원문과 글자 단위로 대조 (구절 ${D.quotes_total.toLocaleString()}개 중 불일치 1건은 값 삭제)`,
+  `날짜·기간·비율 계산과 법 규칙 판정은 코드가 수행`,
+  `정규식 독립 추출과 교차 비교, 어긋난 값은 원문으로 판정: 수치 필드 ${D.acc[0]}/${D.acc[1]} 정답 (${(D.acc[0] / D.acc[1] * 100).toFixed(1)}%)`,
+].map(x => `<li>${x}</li>`).join("");
+$("#mLimit").innerHTML = [
+  `외부감사 대상 기업이라 시드 단계보다 성장한 기업 쪽 (업력 중앙값 11년)`,
+  `2026.6 표준계약서 개정 전에 맺은 계약의 기준선`,
+  `주주간계약 등 공시되지 않는 조항은 보이지 않음`,
+  `보유자 유형은 벤처투자조합만 등록부로 확인, 나머지는 이름 기준 추정`,
+].map(x => `<li>${x}</li>`).join("");
+
+/* 내 조건 계산 */
+const today = new Date().toISOString().slice(0, 10);
+$("#dt").value = today;
+const VENTURE_ACT = ["ac", "vfund", "pfund", "vc"];
+function chip(cls, mark, text) { return `<span class="chip ${cls}"><span class="d" aria-hidden="true">${mark}</span>${text}</span>`; }
+function render() {
+  const ry = parseFloat($("#ryIn").value), rs = parseFloat($("#rsIn").value), inv = $("#inv").value, dt = $("#dt").value || today;
+  const c = id => $("#" + id).checked;
+  let html = `<h3>공시 사례 안에서의 위치</h3>`, qs = [];
+  if (!isNaN(ry)) {
+    const hi = D.ry.filter(x => x > ry).length, eq = D.ry.filter(x => x === ry).length;
+    const top = pct(hi + eq, ryN);
+    html += `<div class="row"><div class="k">상환보장수익률 ${fmt(ry)}%</div><div class="pos">공시 ${ryN}개사 중 이보다 높은 곳 ${hi}개사, 같은 곳 ${eq}개사 → 상위 ${top}% 수준 · 중앙값 ${D.ry_median.toFixed(1)}%</div></div>`;
+    if (ry > 8) qs.push(`상환보장수익률 ${fmt(ry)}%는 공시 사례 상위 ${top}% 수준입니다. 산정 근거와 8% 수준으로 낮출 여지를 물어보세요.`);
+  }
+  if (!isNaN(rs)) {
+    const le = D.rs.filter(x => x <= rs).length;
+    html += `<div class="row"><div class="k">상환청구 개시 ${fmt(rs)}년</div><div class="pos">공시 ${rsN}개사 중 ${fmt(rs)}년 이하는 ${le}개사(${pct(le, rsN)}%) · 3년이 ${D.rs3}개사(${pct(D.rs3, rsN)}%)로 가장 흔함</div></div>`;
+    if (rs < 3) qs.push(`상환청구가 발행 ${fmt(rs)}년 후부터입니다. 공시 사례의 ${pct(D.rs3, rsN)}%는 3년입니다. 개시 시점을 늦출 수 있는지 물어보세요.`);
+  }
+  const rf = [];
+  if (c("ipo")) rf.push(`IPO 공모가 연동 조정은 ${D.rf[0][1]}개사(${pct(D.rf[0][1], D.n)}%)에 있는 흔한 조항`);
+  if (c("dil")) rf.push(`저가 발행 시 최저가 방식: 방식이 적힌 곳의 대부분(${dm["최저가"]}/${dm["최저가"] + dm["가중평균"]}). 2026 표준 기본안은 가중평균`);
+  if (c("nofloor")) rf.push(`조정 하한이 적힌 곳은 ${D.rf[6][1]}개사뿐`);
+  if (rf.length) html += `<div class="row"><div class="k">전환가 조정</div><div class="pos">${rf.join(" · ")}</div></div>`;
+  if (c("dil")) qs.push(`후속 저가 발행 조정을 가중평균 방식(2026 표준계약서 기본안)으로 바꿀 수 있는지 물어보세요.`);
+  if (c("nofloor") && (c("ipo") || c("dil"))) qs.push(`전환가 조정에 하한(예: 최초 전환가의 70%)을 둘 수 있는지 물어보세요.`);
+
+  html += `<h3 style="margin-top:14px">상대 투자자 유형에 따른 규칙</h3>`;
+  const invName = $("#inv").selectedOptions[0].textContent;
+  if (c("joint")) {
+    let r;
+    if (VENTURE_ACT.includes(inv)) r = dt >= "2025-12-30"
+      ? chip("serious", "!", "법으로 제한된 조항 · 전문가 확인 권장") + `<div class="pos">2025.12.30부터 ${esc(invName)}의 투자에서 대표이사 등 이해관계인에게 연대책임을 지우는 것은 금지. 고의·중과실과 법에 열거된 사유만 예외</div>`
+      : chip("warn", "?", "계약 당시 법 시행 전") + `<div class="pos">계약일이 2025.12.30 이전입니다. 계약 당시 기준으로 따로 확인이 필요합니다</div>`;
+    else if (inv === "sintech") r = chip("none", "–", "이 금지 규정의 대상 아님") + `<div class="pos">신기술사업금융업자 고유계정·신기술사업투자조합은 벤처투자법의 연대책임 금지 대상이 아닙니다(여신전문금융업법 개정안 계류). 2026 표준계약서의 연대책임 제한과 비교해 협상하세요</div>`;
+    else r = chip("warn", "?", "투자자 유형 확인 필요") + `<div class="pos">상대가 어떤 투자자인지(벤처투자조합·신기술사업투자조합 등)에 따라 적용 규칙이 갈립니다. 계약서의 투자자 명칭을 확인하세요</div>`;
+    html += `<div class="row"><div class="k">이해관계인 연대책임</div>${r}<div class="law">근거: 벤처투자법 개정(법률 제21287호)</div></div>`;
+    qs.push(`대표이사 연대책임 조항이 있다면, 법이 허용하는 예외 사유(고의·중과실 등)로 범위를 좁힐 수 있는지 물어보세요.`);
+  }
+  if (c("perf") || c("nograce") || c("listing")) {
+    const items = [c("perf") && "실적·성과 미달 시 조기상환·전환가 하향", c("nograce") && "유예기간 없는 조기상환", c("listing") && "미상장 이유 전환가 하향"].filter(Boolean).join(", ");
+    let r;
+    if (inv === "vfund") r = dt >= "2027-03-30"
+      ? chip("serious", "!", "해당하면 그 부분 무효 · 전문가 확인 권장") + `<div class="pos">${items}: 벤처투자조합이 2027.3.30 이후 새로 맺는 계약에서 법이 정한 불공정 유형(사유 없는 성과지표 연동 조기상환, 유예기간 없는 조기상환, 미상장 이유의 과도한 전환가 조정)에 해당하면 그 부분이 무효. 세부 범위는 대통령령으로 정해질 예정(미정)</div>`
+      : chip("warn", "i", "2027.3.30 이후 새 계약부터 적용") + `<div class="pos">${items}: 이 계약일에는 아직 적용되지 않습니다. 2027.3.30부터 벤처투자조합의 새 계약에 적용</div>`;
+    else r = chip("none", "–", "이 금지 규정의 대상 아님") + `<div class="pos">${items}: 제52조의2는 벤처투자조합 업무집행조합원의 계약에만 적용됩니다</div>`;
+    html += `<div class="row"><div class="k">불공정 계약조건 (제52조의2)</div>${r}<div class="law">근거: 벤처투자법 개정(법률 제22034호)</div></div>`;
+    qs.push(`조기상환·전환가 하향 사유가 구체적인 기준과 유예기간을 갖추었는지 물어보세요.`);
+  }
+  if (!c("joint") && !(c("perf") || c("nograce") || c("listing"))) html += `<div class="row"><div class="pos">투자자 유형에 따라 달라지는 조항을 선택하지 않았습니다.</div></div>`;
+
+  html += `<h3 style="margin-top:14px">협상 준비 질문</h3>`;
+  html += qs.length ? `<ol class="q">${qs.map(q => `<li>${q}</li>`).join("")}</ol>` : `<p class="pos">공시 사례와 비교해 두드러지는 조건이 없습니다.</p>`;
+  html += `<p class="note">결론이 아니라 투자자에게 확인할 질문입니다. 위치는 파일럿 공시 ${D.n}개사 기준이며, 규칙 판정은 공개된 법률 문언에 따른 일반 정보입니다.</p>`;
+  $("#out").innerHTML = html;
+}
+$("#f").addEventListener("input", render);
+render();
+</script>
+</body>
+</html>
